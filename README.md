@@ -11,7 +11,7 @@ Usage:
 %cd stable-diffusion-webui
 </ul>
 </span>
-<li>Then copy\past the code from "<b>Colab_AutoWebUI_Downloader.ipynb</b>" to any cell in your Colab sheet and run this cell.</li>
+<li>Then copy\past the full content from "<b>Colab_AutoWebUI_Downloader.ipynb</b>" to any cell in your Colab sheet and run this cell.</li>
 </ol>
 
 <h1>What can it do?</h1>
