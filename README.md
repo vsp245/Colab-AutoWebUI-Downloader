@@ -1,4 +1,4 @@
-<h1>What is it and how to use?</h1>
+<h1>What is it and how to use it?</h1>
 This is the python script of a simple file manager with GUI; working with "AUTO111 SD WebUI" in the Google Colab environment.
 <br><br>
 
