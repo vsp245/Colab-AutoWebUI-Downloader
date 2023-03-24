@@ -48,7 +48,7 @@ Usage:
 </ul>
 <br>
 <h1>Link types</h1>
-Format of the links that the script understands
+Format of the links that the script understands.
 <br><br>
 
 <b>Google Drive</b>
