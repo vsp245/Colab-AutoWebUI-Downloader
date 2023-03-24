@@ -114,7 +114,7 @@ CATALOG = {
 As you can see, the Catalog consists of <b>Labels</b>, which consist of <b>File Names</b>, which can contain three types of fields: <b>"link"</b>, <b>"add"</b> and <b>"dst"</b> 
 <br>
 
-Graphically, it looks like this:
+Graphically it looks like this:
 <br><br>
 ![s_001](/scr/s_001.jpg)
 
