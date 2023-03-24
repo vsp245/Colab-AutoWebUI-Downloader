@@ -4,14 +4,14 @@ This is the python script of a simple file manager with GUI; working with "AUTO1
 
 Usage:
 <ol>
-<li>Clone "AUTO111 SD WebUI" from github and set current directory:</li>
+<li>Clone "AUTO111 SD WebUI" from github:</li>
 <span>
 <ul>
 !git clone <a href="#!">https://github.com/AUTOMATIC1111/stable-diffusion-webui</a><br>
 %cd stable-diffusion-webui
 </ul>
 </span>
-<li>Then copy\past the code from "file" to any cell in your Colab sheet and run this cell.</li>
+<li>Then copy\past the code from "<b>Colab_AutoWebUI_Downloader.ipynb</b>" to any cell in your Colab sheet and run this cell.</li>
 </ol>
 
 <h1>What can it do?</h1>
