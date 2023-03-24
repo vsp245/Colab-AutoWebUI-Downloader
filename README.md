@@ -119,7 +119,7 @@ Graphically, it looks like this:
 ![s_001](/scr/s_001.jpg)
 
 <b>Labels</b><br>
-Labels it is a dropdown menu. Feel free to add your Labels and they will also appear in the interface.
+Label is a dropdown menu. Feel free to add your Labels and they will also appear in the interface.
 <ul><p>
 <b>File Names</b><br>
 This is items in the dropdown menu.
