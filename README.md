@@ -122,7 +122,7 @@ Graphically, it looks like this:
 Labels it is a dropdown menu. Feel free to add your Labels and they will also appear in the interface.
 <ul><p>
 <b>File Names</b><br>
-This is items in the drop down menu.
+This is items in the dropdown menu.
 <p></p>
 <ul>
 <b>"link"</b><br>
