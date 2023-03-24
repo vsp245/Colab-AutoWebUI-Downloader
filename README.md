@@ -143,7 +143,7 @@ In this field you can specify where to save file in "auto" mode, explained below
 Relative paths to different WebUI folders are written inside the script and have the <b>short name</b> abbreviation.
 <br>You can easily add your own paths; for now the following <b>short names</b> available:<br>
 
-```Python 
+```
 models, vae, lora, hypernet, wildcards, text.inv.
 ```
 
