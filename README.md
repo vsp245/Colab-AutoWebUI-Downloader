@@ -65,9 +65,9 @@ Format of the links that the script understands.
 <b>Civitai</b>
 <ul>
 <li>link    : https<i></i>://civitai.com/models/12345/some-name-here</li>
-<p><ul>The latest available "model version" will be downloaded</ul></p>
+<p><ul>The latest available "model version" will be downloaded.</ul></p>
 <li>model version    : 54321</li>
-<p><ul>This is the number that appears when you hover over the "Download" button on the model page</ul></p>
+<p><ul>This is the number that appears when you hover over the "Download" button on the model page.</ul></p>
 </ul>
 
 <b>Mega</b>
