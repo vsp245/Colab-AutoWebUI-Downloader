@@ -76,6 +76,7 @@ Format of the links that the script understands.
 
 The main interface and features of the script are quite obvious. There are only two things that needs to be explained is the catalog structure and "download to auto" mode.
 <br><br>
+
 <h3>Catalog</h3>
 The Catalog is a regular Python dictionary, and its looks like this:
 
