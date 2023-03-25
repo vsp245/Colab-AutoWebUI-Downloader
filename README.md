@@ -129,12 +129,9 @@ In this field you can specify other <b>File Names</b> from Catalog or <b>links</
 </p>
 <b>"dst"</b><br>
 In this field you can specify where to save file in "auto" mode, explained below.
+</ul></ul>
 <br>
-</ul>
-</ul>
 
-
-<br><br>
 <h3>Download to auto</h3>
 Relative paths to different WebUI folders are written inside the script and have the <b>short name</b> abbreviation.
 <br>You can easily add your own paths; for now the following <b>short names</b> available:<br>
@@ -152,4 +149,4 @@ For example, if the <b>Label</b> is named "<b>models</b>" and "auto" mode select
  <br>For example, whith "dst":"<b>text.inv.</b>" and "auto" mode selected, the file will be saved to "<b>/embeddings</b>" path.</p>
 <p>If the path could not be determined, the file will be saved to the WebUI root folder, from where you can easily move it using the file manager features.</p>
 </ul>
-In other words "auto" mode is: "dst" field > civitai classification > Label name
+In other words "auto" mode is: "dst" field > civitai classification > Label name.
