@@ -1,17 +1,15 @@
 <h1>What is it and how to use it?</h1>
 This is the Python script of a simple file manager with GUI; working with "AUTO111 SD WebUI" in the Google Colab environment.
 <br><br>
-
 Usage:
 <ol>
 <li>Clone "AUTO111 SD WebUI" from github:</li>
 <span>
 <ul>
-!git clone <a href="#!">https://github.com/AUTOMATIC1111/stable-diffusion-webui</a><br>
-%cd stable-diffusion-webui
+!git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui
 </ul>
 </span>
-<li>Then copy\past the full content from "<b>Colab_AutoWebUI_Downloader.ipynb</b>" to any cell in your Colab sheet and run this cell.</li>
+<li>Then copy\past the full content from "<b>Colab_AutoWebUI_Downloader.py</b>" to any cell in your Colab sheet and run this cell.</li>
 </ol>
 
 <h1>What can it do?</h1>
@@ -23,45 +21,39 @@ Usage:
 <li>Civitai</li>
 <li>Mega</li>
 </ul>
-
 <b>Uploading files to</b>
 <ul>
 <li>Google Drive</li>
 <li>Mega</li>
 </ul>
-
 <b>File Catalog</b>
 <ul>
 <li>You can list all your files and models links, group them for flexible access.</li>
 </ul>
-
 <b>File Manager</b>
 <ul>
 <li>Copying\Moving files within "AUTO111 SD WebUI" and Google Drive.</li>
 </ul>
-
 <b>Download Images</b>
 <ul>
 <li>A standard feature that just has to be here.</li>
 <li>Pack all images from a specific folder and download using a browser.</li>
 <li>Copy images to Google Drive.</li>
-</ul>
-<br>
+</ul><br>
+
 <h1>Link types</h1>
+
 Format of the links that the script understands.
 <br><br>
-
 <b>Google Drive</b>
 <ul>
 <li>link    : https<i></i>://drive.google.com/file/d/xxxxxxxx-33characters-xxxxxxxxxxx/</li>
 <li>file id : xxxxxxxx-33characters-xxxxxxxxxxx</li>
 </ul>
-
 <b>HuggingFace</b>
 <ul>
 <li>link    : https<i></i>://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt</li>
 </ul>
-
 <b>Civitai</b>
 <ul>
 <li>link    : https<i></i>://civitai.com/models/12345/some-name-here</li>
@@ -69,7 +61,6 @@ Format of the links that the script understands.
 <li>model version    : 54321</li>
 <p><ul>This is the number that appears when you hover over the "Download" button on the model page.</ul></p>
 </ul>
-
 <b>Mega</b>
 <ul>
 <li>link    : https<i></i>://mega.nz/file/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</li>
