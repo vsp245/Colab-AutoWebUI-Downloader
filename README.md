@@ -1,3 +1,4 @@
+![s_000](/scr/s_000.jpg)
 <h1>What is it and how to use it?</h1>
 This is the Python script of a simple file manager with GUI; working with "AUTO111 SD WebUI" in the Google Colab environment.
 <br><br>
