@@ -150,10 +150,10 @@ models, vae, lora, hypernet, wildcards, text.inv.
 When you download a file, you can choose from paths <b>short names</b> where to save it. Or you can leave the "auto" option. In this case, the following logic will be used:
 <ul>
 <p>If the <b>Label</b> matches the path <b>short name</b>, then everything from this <b>Label</b> will be saved to this path.<br>
-For example, if the <b>Label</b> is named "<b>models</b>" and "auto" mode selected, then all files downloaded from this <b>Label</b> will be saved to "<b>/models/Stable-diffusion</b>" path. If the <b>Label</b> is named "<b>text.inv.</b>" and "auto" mode selected, then all files downloaded from this <b>Label</b> will be saved to "<b>/embeddings</b>" path.</p>
+For example, if the <b>Label</b> is named "<b>models</b>" and "auto" mode selected, then all files downloaded from this <b>Label</b> will be saved to "<b>/models/Stable-diffusion</b>" path.<br>If the <b>Label</b> is named "<b>text.inv.</b>" and "auto" mode selected, then all files downloaded from this <b>Label</b> will be saved to "<b>/embeddings</b>" path.</p>
 <p>If the file is downloaded from civitai.com, and "auto" mode selected, then the script will first try to determine saving path according to civitai classification.</p>
 <p>If the file has "dst" field specified, and "auto" mode selected, then all previous methods will be ignored and the file will be saved in corresponding path.
  <br>For example, whith "dst":"<b>text.inv.</b>" and "auto" mode selected, the file will be saved to "<b>/embeddings</b>" path.</p>
-<p>If the path could not be determined, the file will be saved to the WebUI root folder, from where you can easily move it to where you need it using the file manager.</p>
+<p>If the path could not be determined, the file will be saved to the WebUI root folder, from where you can easily move it using the file manager features.</p>
 </ul>
 In other words "auto" mode is: "dst" field >> civitai classification >> Label name
