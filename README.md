@@ -152,4 +152,4 @@ For example, if the <b>Label</b> is named "<b>models</b>" and "auto" mode select
  <br>For example, whith "dst":"<b>text.inv.</b>" and "auto" mode selected, the file will be saved to "<b>/embeddings</b>" path.</p>
 <p>If the path could not be determined, the file will be saved to the WebUI root folder, from where you can easily move it using the file manager features.</p>
 </ul>
-In other words "auto" mode is: "dst" field >> civitai classification >> Label name
+In other words "auto" mode is: "dst" field > civitai classification > Label name
