@@ -84,8 +84,8 @@ civitai_type_map = {
 }
 
 # only these files are seen by the script
-EXT = (".ckpt", ".safetensors", ".pt", ".yaml")
-IMG = (".png", ".txt", ".jpg")
+EXT = (".ckpt", ".safetensors", ".pt", ".bin", ".json", ".yaml",)
+IMG = (".png", ".txt", ".jpg",)
 
 
 if 'do_once' not in dir():
@@ -192,7 +192,7 @@ class WebUIDownloaderFile(WebUIDownloader):
         os.makedirs(dst, exist_ok=True)
         shutil.copy2(self.dir+os.sep+self.filename,
                     dst+os.sep+self.filename)
-        new_obj = type(self)(dst, self.filename, new_label)
+        new_obj = WebUIDownloaderFile(dst, self.filename, new_label)
         self.reg.setdefault(new_label, {})[self.filename] = new_obj
         
     def new_dir_and_label(self, dst_label):
@@ -339,6 +339,8 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
     def download(self, dst_label, **kw):
         ''' main download method '''
         
+        if 'qu' in kw:
+            dst_label = self.label or dst_label
         new_filename, size, dst = self.download_switch(self.link,
                                                        dst_label, **kw)
         if new_filename is not None:
@@ -351,9 +353,11 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             print(f"> {self.dir}{os.sep}{self.filename}",
                   "> download done\n\n", sep="\n")
         if self.add is not None:
-            self.queue.extend(self.add.split(","))
+            tmp_dst = self.label or dst_label
+            self.queue.extend([a, tmp_dst] for a in self.add.split(","))
         if self.queue:
-            type(self)(self.queue.pop(0)).download("auto")
+            nxt = self.queue.pop(0)
+            type(self)(nxt[0]).download(nxt[1], qu=True)
         else:
             self.queue_done.clear()
         
@@ -481,12 +485,18 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                             str(r.content)[:150])
             
         filename = r.headers.get("content-disposition")
-        tmp = re.search('(?<=filename=")[^"]+', filename)
-        if tmp is not None:
-            filename = tmp.group()
+        if filename is None:
+            if link.endswith(EXT):
+                filename = link.rsplit('/')[-1]
+            else:
+                raise Exception("> download error (EXT)")
         else:
-            raise Exception("> requests > can't find filename\n"+
-                            str(filename))
+            tmp = re.search('(?<=filename=")[^"]+', filename)
+            if tmp is not None:
+                filename = tmp.group()
+            else:
+                raise Exception("> requests > can't find filename\n"+
+                                str(filename))
         if dst:
             os.makedirs(dst, exist_ok=True)
             out = dst + os.sep + filename
