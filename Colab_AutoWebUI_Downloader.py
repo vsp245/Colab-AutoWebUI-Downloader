@@ -19,7 +19,6 @@ CATALOG = {
         
     },
     
-    
     "other":{
         
         "ft-mse-840000-ema-pruned":{
@@ -29,7 +28,6 @@ CATALOG = {
         
     },
     
-    
     "for merge": {
         
         "set for merge №1": {
@@ -37,6 +35,7 @@ CATALOG = {
         },
         
     },
+
 }
 
 
@@ -931,19 +930,26 @@ class MegaD:
     @classmethod
     def installing(cls, pkl=False):
         if not os.path.exists("/usr/bin/mega-cmd"):
-            print("Installing MEGA ...")
-            cls.runSh('sudo apt-get -y update')
-            cls.runSh('sudo apt-get -y install libmms0 libc-ares2 libc6 libcrypto++6 libgcc1 libmediainfo0v5 libpcre3 libpcrecpp0v5 libssl1.1 libstdc++6 libzen0v5 zlib1g apt-transport-https')
-            cls.runSh('sudo curl -sL -o /var/cache/apt/archives/MEGAcmd.deb https://mega.nz/linux/MEGAsync/Debian_9.0/amd64/megacmd-Debian_9.0_amd64.deb', output=True)
-            cls.runSh('sudo dpkg -i /var/cache/apt/archives/MEGAcmd.deb')
-            print("MEGA is installed.")
-            #output.clear()
+            print("> installing MEGA ...")
+            cls.runSh("sudo apt-get -y update")
+            cls.runSh("sudo apt-get -y install libmms0 libc-ares2 libc6 libcrypto++6 libgcc1 libmediainfo0v5 libpcre3 libpcrecpp0v5 libssl1.1 libstdc++6 libzen0v5 zlib1g apt-transport-https")
+            cls.runSh("sudo curl -sL -o /var/cache/apt/archives/MEGAcmd.deb https://mega.nz/linux/MEGAsync/Debian_9.0/amd64/megacmd-Debian_9.0_amd64.deb", output=True)
+            cls.runSh("sudo dpkg -i /var/cache/apt/archives/MEGAcmd.deb")
+            cls.fix_installing()
+            print("> installation done")
         elif pkl:
             !pkill mega-cmd
         
+    @classmethod 
+    def fix_installing(cls):
+        out = cls.runSh("mega-version")
+        if out:
+            print("> fix broken install")
+            cls.runSh("apt --fix-broken install")
+    
     @classmethod
     def logout(cls):
-        cls.runSh('mega-logout', output=True)
+        cls.runSh("mega-logout", output=True)
         os.remove("/root/.megaCmd/session")
         
     @classmethod
@@ -964,11 +970,11 @@ class MegaD:
     @classmethod
     def transferring(cls, cmd):
         proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                # Make all end-of-lines '\n'
-                universal_newlines=True, )
+               cmd,
+               stdout=subprocess.PIPE,
+               stderr=subprocess.STDOUT,
+               # Make all end-of-lines '\n'
+               universal_newlines=True, )
         out = []
         for line in cls.unbuffered(proc):
             out.append(line)
