@@ -981,7 +981,6 @@ class MegaD:
             print('\r'+line, end='')
         print(f'\n{out[-2]}')
         
-    
     @classmethod
     def unbuffered(cls, proc, stream='stdout'):
         newlines = ['\n', '\r\n', '\r']
