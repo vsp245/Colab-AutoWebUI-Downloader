@@ -1,47 +1,35 @@
-
 # an example of catalog
 CATALOG = {
-
-    "models":{# <== "label name", you can add your own like this
-        
-        "sd1.4":{ # <== "file name", displayed in the dropdown menu
+    "models":{# <== "label name"
+        "sd1.4":{ # <== "file name"
             "link": "https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt",
         },
-        
         "Analog Diffusion":{
-            "link": "1344", # <== in the "link" field, you can specify any links that the script understands
+            "link": "1344",
         },
-        
         "stable diffusion v1.5":{
-            "link": "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt", # <== in the link field, you can specify any links that the script understands
-            "add": "ft-mse-840000-ema-pruned", # <== "add" is what to download along with the main link
+            "link": "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt",
+            "add": "ft-mse-840000-ema-pruned",
         },
-        
     },
-    
     "other":{
-        
         "ft-mse-840000-ema-pruned":{
             "link": "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.ckpt",
-            "dst": "vae", # <== "dst" is where to save the file in "auto" mode
+            "dst": "vae",
         },
-        
     },
-    
     "for merge": {
-        
         "set for merge №1": {
-            "add": "1344, sd1.4", # <== "add" can be link or "file name" from this CATALOG, comma delimiter
+            "add": "1344, sd1.4", # <== comma delimiter
         },
-        
     },
-
 }
 
 
 # next, all paths that are used in the script
 # you can add any path here, respecting the python dictionary markup
 PATHS={
+"webui root path"    : "/stable-diffusion-webui",
 "google drive mount" : "/content/drive",
 "google drive"  :{
         "gd root"    : "/MyDrive",
@@ -62,7 +50,6 @@ PATHS={
         "lora"       : "/models/Lora",
         "hypernet"   : "/models/hypernetworks",
         "text.inv."  : "/embeddings",
-        "wildcards"  : "/extensions/stable-diffusion-webui-wildcards/wildcards",
 },}
 
 
@@ -79,7 +66,6 @@ civitai_type_map = {
 "hypernetwork"     : "hypernet",
 "lora"             : "lora",
 "locon"            : "lora",
-"wildcards"        : "wildcards",
 }
 
 # only these files are seen by the script
@@ -111,7 +97,7 @@ class WebUIDownloader:
         cls.gd_PATHS = dict(("[ gdrive ] "+k, v) for k, v
                             in PATHS.get("google drive",{}).items())
         for w in os.walk(os.getcwd()):
-            if w[0].endswith('/stable-diffusion-webui'):
+            if w[0].endswith(PATHS["webui root path"]):
                 cls.root = w[0]
                 mp = !findmnt -S 'drive' -o 'target' -n
                 if mp:
@@ -457,7 +443,7 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                     "name"  : f["name"],
                     "size"  : int(kb/1024) if kb >= 1024 else round(kb/1024, 3),
                     "type"  : f["type"],
-                    "params": {"type": f["type"], "format": f["format"]},
+                    "params": {"type": f["type"], "format": f["metadata"]["format"]},
                     "dst"   : dst_type,},)
             WebUIDownloaderGUI.popup_menu(to_popup_menu)
             return None, None, None
@@ -907,7 +893,7 @@ class WebUIDownloaderGUI:
 
 
 # ===========================
-#       === Mega ===
+#        === Mega ===
 # ===========================
 
 class MegaD:
@@ -940,7 +926,7 @@ class MegaD:
         elif pkl:
             !pkill mega-cmd
         
-    @classmethod 
+    @classmethod
     def fix_installing(cls):
         out = cls.runSh("mega-version")
         if out:
@@ -966,7 +952,7 @@ class MegaD:
     @classmethod
     def upload(cls, localfile):
         cls.transferring(["mega-put", localfile])
-    
+        
     @classmethod
     def transferring(cls, cmd):
         proc = subprocess.Popen(
@@ -1000,7 +986,7 @@ class MegaD:
                     last = stream.read(1)
                 out = ''.join(out)
                 yield out
-    
+
 
 # ===========================
 #       === Run ===
