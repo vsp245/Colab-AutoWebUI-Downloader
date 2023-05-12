@@ -1,3 +1,4 @@
+
 # an example of catalog
 CATALOG = {
     "models":{# <== "label name"
@@ -297,13 +298,13 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         if self.filename is None:
             return
         if not new_filename.endswith(EXT):
-            print("> Attention: not expected file extension\n"+
-                  f"> File: {new_filename}\n")
+            print(">>> Not expected file extension\n"+
+                  f"> file: {new_filename}\n")
         if self.filename.endswith(EXT):
             self.filename = self.filename.rsplit('.', 1)[0]
         if self.filename.lower() != new_filename.rsplit('.', 1)[0].lower():
-            raise Exception(f"> filename error" +
-                            f"expect: {self.filename}\nname: {new_filename}")
+            print(">>> Not expected file name\n"+
+                  f"name: {new_filename}\nexpect: {self.filename}\n")
         
     def get_dir(self, dst=None, colab_root_check=True):
         ''' check that the file exists at the destination path
