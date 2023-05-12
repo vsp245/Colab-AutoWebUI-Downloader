@@ -299,12 +299,12 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             return
         if not new_filename.endswith(EXT):
             print(">>> Not expected file extension\n"+
-                  f"> file: {new_filename}\n")
+                  f"file name: {new_filename}\n")
         if self.filename.endswith(EXT):
             self.filename = self.filename.rsplit('.', 1)[0]
         if self.filename.lower() != new_filename.rsplit('.', 1)[0].lower():
             print(">>> Not expected file name\n"+
-                  f"name: {new_filename}\nexpect: {self.filename}\n")
+                  f"file name: {new_filename}\nexpect: {self.filename}\n")
         
     def get_dir(self, dst=None, colab_root_check=True):
         ''' check that the file exists at the destination path
