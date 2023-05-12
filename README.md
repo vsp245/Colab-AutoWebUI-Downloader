@@ -138,7 +138,7 @@ Relative paths to different WebUI folders are written inside the script and have
 <br>You can easily add your own paths; for now the following <b>short names</b> available:<br>
 
 ```
-models, vae, lora, hypernet, wildcards, text.inv.
+models, vae, lora, hypernet, text.inv.
 ```
 
 When you download a file, you can choose from paths <b>short names</b> where to save it. Or you can leave the "auto" option. In this case, the following logic will be used:
