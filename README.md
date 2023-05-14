@@ -62,6 +62,8 @@ Format of the links that the script understands.
 <ul>
 <li>link : https<i></i>://civitai.com/models/12345/some-name-here</li>
 <p><ul>The latest available "model version" will be downloaded.</ul></p>
+<li>link : https<i></i>://civitai.com/models/12345?modelVersionId=54321</li>
+<p><ul>Link with specific "model version".</ul></p>
 <li>model version : 54321</li>
 <p><ul>This is the number that appears when you hover over the "Download" button on the model page.</ul></p>
 </ul>
