@@ -265,7 +265,8 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         input_ = input_.strip()
         
         if input_ in self.queue_done:
-            self.link, self.add = None, None
+            # skip
+            self.link, self.add, self.label = None, None, None
             return
         for k, v in CATALOG.items():
             item = v.get(input_)
@@ -355,9 +356,13 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         elif kw and 'type' in kw:
             return self.d_civitai(id_=link, dst_label=dst_label,
                                   forced_download=True, **kw)
-        elif 1<=len(link)<=5 and link.isdigit(): # civitai id: 5 digits
+        elif link.isdigit():
+            # civitai model version id
             return self.d_civitai(id_=link, dst_label=dst_label)
-        elif 25<=len(link)<=33 or link.startswith('https://drive.google.com/'):
+        elif 25<=len(link)<=33 and not link.startswith('https'):
+            # google drive file id
+            return self.d_google_drive(link, dst_label)
+        elif link.startswith('https://drive.google.com/'):
             return self.d_google_drive(link, dst_label)
         elif link.startswith('https://civitai.com/'):
             return self.d_civitai(link=link, dst_label=dst_label)
@@ -409,10 +414,16 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             
         if not forced_download:
             print ('\n> download from civitai.com\n')
+        
+        if link is not None:
+            id_ = re.search("(?<=modelVersionId=)\d+", link)
+            if id_ is not None:
+                id_ = id_.group()
+                link = None
             
         if link is not None:
             # get civitai "model" id, 5 digits from url
-            idl = re.search("(?<=/)\d{1,5}(?=/)", link)
+            idl = re.search("(?<=models/)\d+(?=(/|$))", link)
             if idl is not None:
                 idl = idl.group()
             else:
