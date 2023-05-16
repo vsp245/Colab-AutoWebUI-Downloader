@@ -258,8 +258,7 @@ class WebUIDownloaderImages(WebUIDownloader):
 class WebUIDownloaderNew(WebUIDownloaderFile):
     ''' class for new downloaded files '''
     
-    queue = []
-    queue_done = []
+    queue, queue_done, error_report = [], [], []
     
     def __init__(self, input_):
         input_ = input_.strip()
@@ -281,6 +280,7 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                 else:
                     self.label = k
                 break
+                self.queue_done.append(self.link)
         else:
             self.filename = None
             # self.short = None # wip
@@ -299,13 +299,15 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         if self.filename is None:
             return
         if not new_filename.endswith(EXT):
-            print(">>> Not expected file extension\n"+
+            print("\n>>> Not expected file extension\n"+
                   f"file name: {new_filename}\n")
+            self.error_report.append(f"not expected file extension: {self.filename}")
         if self.filename.endswith(EXT):
             self.filename = self.filename.rsplit('.', 1)[0]
         if self.filename.lower() != new_filename.rsplit('.', 1)[0].lower():
-            print(">>> Not expected file name\n"+
+            print("\n>>> Not expected file name\n"+
                   f"file name: {new_filename}\nexpect: {self.filename}\n")
+            self.error_report.append(f"not expected file name: {self.filename}")
         
     def get_dir(self, dst=None, colab_root_check=True):
         ''' check that the file exists at the destination path
@@ -336,9 +338,8 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             self.get_dir(dst)
             self.size = self.get_size() if size is None else size
             self.file_add()
-            self.queue_done.append(self.link)
-            print(f"> {self.dir}{os.sep}{self.filename}",
-                  "> download done\n\n", sep="\n")
+            print("-"*30, f"> {self.dir}{os.sep}{self.filename}",
+                  "> download done", "-"*30+"\n\n", sep="\n")
         if self.add is not None:
             tmp_dst = self.label or dst_label
             self.queue.extend([a, tmp_dst] for a in self.add.split(","))
@@ -347,6 +348,10 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             type(self)(nxt[0]).download(nxt[1], qu=True)
         else:
             self.queue_done.clear()
+            if self.error_report:
+                print ("\n>>> report:")
+                for e in self.error_report: print(f"  {e}")
+                self.error_report.clear()
         
     def download_switch(self, link, dst_label, **kw):
         ''' recognize the link and send it further for downloading '''
@@ -354,8 +359,9 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         if link is None:
             return None, None, None
         elif kw and 'type' in kw:
+            # for civitai popup download
             return self.d_civitai(id_=link, dst_label=dst_label,
-                                  forced_download=True, **kw)
+                                  popup_download=True, **kw)
         elif link.isdigit():
             # civitai model version id
             return self.d_civitai(id_=link, dst_label=dst_label)
@@ -371,7 +377,10 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         elif link.startswith('https://mega.nz/'):
             return self.d_mega(link, dst_label)
         else:
-            raise Exception(f'unknown link type:\n{link}')
+            print ("-"*30, f">>> unknown link type:\n{link}",
+                   "-"*30+"\n\n", sep="\n")
+            self.error_report.append(f"unknown link type: {link}")
+            return None, None, None
         
     def d_huggingface(self, link, dst_label):
         print ('\n> download from huggingface.co\n')
@@ -409,56 +418,51 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         print("\n")
         return None, None, None
          
-    def d_civitai(self, id_=None, link=None, dst_label=None,
-                        type=None, prm=None, forced_download=False):
-            
-        if not forced_download:
-            print ('\n> download from civitai.com\n')
+    def d_civitai(self, id_=None, link=None, dst_label=None, idm=None,
+                        type=None, prm=None, popup_download=False):
+        ''' id_ = modelVersionId, idm = modelId '''
         
-        if link is not None:
-            id_ = re.search("(?<=modelVersionId=)\d+", link)
-            if id_ is not None:
-                id_ = id_.group()
-                link = None
+        if not popup_download:
+            print ('\n> download from civitai.com\n')
             
-        if link is not None:
-            # get civitai "model" id, 5 digits from url
-            idl = re.search("(?<=models/)\d+(?=(/|$))", link)
-            if idl is not None:
-                idl = idl.group()
-            else:
-                raise Exception(f"> civitai link error:\n{link}")
+            if link is not None:
+                id_, idm, prm = self.d_civitai_pars_link(link)
             
-            civitai_model = self.d_requests_get_json(
-                            f"https://civitai.com/api/v1/models/{idl}")
-            id_ = str(civitai_model["modelVersions"][0]["id"])
-            files = civitai_model["modelVersions"][0]["files"]
-            type = civitai_model["type"].lower()
-            
-        elif id_ is not None and not forced_download:
-            civitai_file = self.d_requests_get_json(
-                           f"https://civitai.com/api/v1/model-versions/{id_}")
-            files = civitai_file["files"]
-            type = civitai_file["model"]["type"].lower()
-            
-        if not forced_download and len(files) > 1:
-            to_popup_menu = []
-            for f in files:
-                kb = f["sizeKB"]
-                dst_type = f["type"].lower()
-                if type and type != "checkpoint" and dst_type == "model":
-                    dst_type = civitai_type_map.get(type) or "root"
-                else:
-                    dst_type = civitai_type_map.get(dst_type) or "root"
-                to_popup_menu.append({
-                    "id"    : id_,
-                    "name"  : f["name"],
-                    "size"  : int(kb/1024) if kb >= 1024 else round(kb/1024, 3),
-                    "type"  : f["type"],
-                    "params": {"type": f["type"], "format": f["metadata"]["format"]},
-                    "dst"   : dst_type,},)
-            WebUIDownloaderGUI.popup_menu(to_popup_menu)
-            return None, None, None
+            if idm:
+                civitai_model = self.d_requests_get_json(
+                                f"https://civitai.com/api/v1/models/{idm}")
+                id_ = str(civitai_model["modelVersions"][0]["id"])
+                type = civitai_model["type"].lower()
+                files = civitai_model["modelVersions"][0]["files"]
+            elif id_:
+                civitai_model_v = self.d_requests_get_json(
+                               f"https://civitai.com/api/v1/model-versions/{id_}")
+                type = civitai_model_v["model"]["type"].lower()
+                files = civitai_model_v["files"]
+                
+                if prm and len(files) > 1:
+                    prm_type = prm.get("type", "").lower()
+                    if prm_type != "model":
+                        type = civitai_type_map.get(prm_type) or type
+                
+            if not prm and len(files) > 1:
+                to_popup_menu = []
+                for f in files:
+                    kb = f["sizeKB"]
+                    dst_type = f["type"].lower()
+                    if type and type != "checkpoint" and dst_type == "model":
+                        dst_type = civitai_type_map.get(type) or "root"
+                    else:
+                        dst_type = civitai_type_map.get(dst_type) or "root"
+                    to_popup_menu.append({
+                        "id"    : id_,
+                        "name"  : f["name"],
+                        "size"  : int(kb/1024) if kb >= 1024 else round(kb/1024, 3),
+                        "type"  : f["type"],
+                        "params": {"type": f["type"], "format": f["metadata"]["format"]},
+                        "dst"   : dst_type,},)
+                WebUIDownloaderGUI.popup_menu(to_popup_menu)
+                return None, None, None
             
         print (f"> civitai model version id : {id_}",
                f"> civitai model type       : {type}\n", sep="\n")
@@ -467,6 +471,24 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         dst, self.label = self.new_dir_and_label(dst_label)
         link = f"https://civitai.com/api/download/models/{id_}"
         return self.d_requests_get_file(link, dst=dst, params=prm)
+        
+    @staticmethod
+    def d_civitai_pars_link(link):
+        id_ = re.search("(?<=modelVersionId=)\d+", link)
+        if id_ is not None:
+            return id_.group(), None, None
+        if "/api/" in link:
+            id_ = re.search("(?<=models/)\d+(?=\?)", link)
+            if id_ is not None:
+                new_prm = re.findall("(?<=&|\?)[^&]+=[^&]+", link)
+                if new_prm:
+                    prm = dict(e.split("=", 1) for e in new_prm)
+                    return id_.group(), None, prm
+        else:
+            idm = re.search("(?<=models/)\d+(?=(/|$))", link)
+            if idm is not None:
+                return None, idm.group(), None
+        raise Exception(f"> civitai link error:\n{link}")
         
     def d_requests_get_json(self, link):
         r = requests.get(link)
@@ -723,6 +745,7 @@ class WebUIDownloaderGUI:
                 continue
             f = cls.popup_files[i]
             try:
+                # f["id"] = modelVersionId
                 WebUIDownloaderNew(f["id"]).download(dst.value,
                                                      prm=f["params"],
                                                      type=f["type"])
