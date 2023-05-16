@@ -61,9 +61,11 @@ Format of the links that the script understands.
 <b>Civitai</b>
 <ul>
 <li>link : https<i></i>://civitai.com/models/12345/some-name-here</li>
-<p><ul>The latest available "model version" will be downloaded.</ul></p>
+<p><ul>The latest available "model version" will be downloaded. A file selection menu will popup if needed.</ul></p>
 <li>link : https<i></i>://civitai.com/models/12345?modelVersionId=54321</li>
-<p><ul>Link with specific "model version".</ul></p>
+<p><ul>Link with specific "model version". A file selection menu will popup if needed.</ul></p>
+<li>link : https<i></i>://civitai.com/api/download/models/12345?type=Model&format=PickleTensor</li>
+<p><ul>Direct download link.</ul></p>
 <li>model version : 54321</li>
 <p><ul>This is the number that appears when you hover over the "Download" button on the model page.</ul></p>
 </ul>
