@@ -1,7 +1,7 @@
 
-# an example of catalog
+''' an example of catalog '''
 CATALOG = {
-    "models":{# <== "label name"
+    "models":{ # <== "label name"
         "sd1.4":{ # <== "file name"
             "link": "https://huggingface.co/CompVis/stable-diffusion-v-1-4-original/resolve/main/sd-v1-4.ckpt",
         },
@@ -27,37 +27,44 @@ CATALOG = {
 }
 
 
-# next, all paths that are used in the script
-# you can add any path here, respecting the python dictionary markup
-PATHS={
-"webui root path"    : "/stable-diffusion-webui",
-"google drive mount" : "/content/drive",
-"google drive"  :{
-        "gd root"    : "/MyDrive",
-        "some dir"   : "/MyDrive/some_dir",
+''' next, all paths that are used in the script
+you can add any path here, respecting the python dictionary markup '''
+PATHS = {
+"webui root"         : "/stable-diffusion-webui",
+"environment root"   : {
+        "google"     : "/content",
+        "sagemaker"  : "/home/studio-lab-user",
+       #"kaggle"     : "/kaggle/working",
 },
-"webui images"  :{
+"google drive"       : {
+        "drive mount": "/content/drive", # don't change it
+        "gd root"    : "/MyDrive",
+        "some dir"   : "/MyDrive/any_you_dir_here",
+},
+"webui images"       : {
         "txt2img"    : "/outputs/txt2img-images",
         "img2img"    : "/outputs/img2img-images",
         "extras"     : "/outputs/extras-images",
         "txt2img-gr" : "/outputs/txt2img-grids",
         "img2img-gr" : "/outputs/img2img-grids",
         "log-images" : "/log/images",
+        "my_dir"     : "/img_out",
 },
-"webui files"   :{
+"webui files"        : {
         "root"       : "", # don't change it
         "models"     : "/models/Stable-diffusion",
         "vae"        : "/models/VAE",
         "lora"       : "/models/Lora",
         "hypernet"   : "/models/hypernetworks",
         "text.inv."  : "/embeddings",
+        "lycoris"    : "/models/LyCORIS",
 },}
 
 
-# next, is how the script understands civitai.com file types
-# needed only for "auto" save path detection
-# you can add your own in lowercase
-# "civitai type on left" : "script type ('webui files') on right"
+''' next, is how the script understands civitai.com file types
+needed only for "auto" save path detection
+you can add your own in lower case
+civitai type on left = script type on right ("webui files") '''
 civitai_type_map = {
 "pruned model"     : "models",
 "model"            : "models",
@@ -66,24 +73,23 @@ civitai_type_map = {
 "textualinversion" : "text.inv.",
 "hypernetwork"     : "hypernet",
 "lora"             : "lora",
-"locon"            : "lora",
+"locon"            : "lycoris",
 }
 
-# only these files are seen by the script
+''' only these files are seen by the script '''
 EXT = (".ckpt", ".safetensors", ".pt", ".bin", ".json", ".yaml",)
 IMG = (".png", ".txt", ".jpg",)
-
+ZIP = (".zip",)
 
 if 'do_once' not in dir():
     do_once = None
-    !pip install --upgrade --no-cache-dir gdown
-    import os, re, shutil, requests, gdown
+    !pip install -U --no-cache-dir gdown --pre # gdown --no-cookies XXX
+    import os, re, shutil, requests, gdown, time
     import subprocess, shlex, contextlib # for Mega
     import ipywidgets as wgt
-    from IPython.display import display, HTML
-    from google.colab import drive, output, files
+    from IPython.display import display, HTML, clear_output, FileLink
     if 'CATALOG' not in dir(): CATALOG = {}
-    output.clear()
+    clear_output()
 
 
 # ===========================
@@ -91,22 +97,39 @@ if 'do_once' not in dir():
 # ===========================
 
 class WebUIDownloader:
+
+    do_unzip, remove_zip = True, True
     
     @classmethod
     def __init__(cls):
         cls.reg = {}
-        cls.gd_PATHS = dict(("[ gdrive ] "+k, v) for k, v
-                            in PATHS.get("google drive",{}).items())
-        for w in os.walk(os.getcwd()):
-            if w[0].endswith(PATHS["webui root path"]):
+        cls.gd_PATHS = []
+        cls.mountpoint = None
+        
+        if "COLAB_RELEASE_TAG" in os.environ:
+            cls.env = "google"
+        elif "HOME" in os.environ and "studio-lab" in os.environ["HOME"]:
+            cls.env = "sagemaker"
+        else:
+            raise Exception("ERROR: can't determine environment")
+        
+        cls.prnt = WebUIDownloaderGUI.env_print(cls.env)
+        
+        for w in os.walk(PATHS["environment root"][cls.env]):
+            if w[0].endswith(PATHS["webui root"]):
                 cls.root = w[0]
-                mp = !findmnt -S 'drive' -o 'target' -n
-                if mp:
-                    cls.mountpoint = mp[0]
-                else:
-                    cls.mountpoint = PATHS["google drive mount"]
-                return
-        raise Exception("ERROR: can't find WebUI path, get WebUI from github first")
+                break
+        else:
+            raise Exception("ERROR: can't find WebUI path, get WebUI from github first")
+        
+        if cls.env == "google":
+            cls.gd_PATHS = dict(("[ gdrive ] "+k, v) for k, v
+                                in PATHS.get("google drive",{}).items() if k != "drive mount")
+            mp = !findmnt -S 'drive' -o 'target' -n
+            if mp:
+                cls.mountpoint = mp[0]
+            else:
+                cls.mountpoint = PATHS["google drive"]["drive mount"]
         
     @classmethod
     def get_files_menu(cls, gd=False):
@@ -125,7 +148,7 @@ class WebUIDownloader:
         return out
         
     @classmethod
-    def upd_reg(cls, gd=False, r=None, P=PATHS.get("webui files", {})):
+    def fill_reg(cls, gd=False, r=None, P=PATHS.get("webui files", {})):
         r = r or cls.root
         for label, pth in P.items():
             try:
@@ -138,11 +161,11 @@ class WebUIDownloader:
                     del cls.reg[label][filename]
             for new in ldir:
                 if new.endswith(EXT) and new not in files:
-                    WebUIDownloaderFile(r + pth, new, label).file_add()
+                    WebUIDownloaderFile(r + pth, new, label).reg_add()
             if type(files) is dict and not cls.reg[label]:
                 del cls.reg[label]
         if gd:
-            cls.upd_reg(r=cls.mountpoint, P=cls.gd_PATHS) # hook wip
+            cls.fill_reg(r=cls.mountpoint, P=cls.gd_PATHS) # hook wip
 
 
 class WebUIDownloaderFile(WebUIDownloader):
@@ -154,37 +177,43 @@ class WebUIDownloaderFile(WebUIDownloader):
         self.label = label
         self.size = self.get_size()
         
-    def file_add(self):
-        self.reg.setdefault(self.label, {})[self.filename] = self
+    def reg_add(self, obj=None):
+        if not obj:
+            obj = self
+        self.reg.setdefault(obj.label, {})[obj.filename] = obj
+        
+    def reg_rem(self):
+        del self.reg[self.label][self.filename]
+        if not self.reg[self.label]:
+            del self.reg[self.label]
         
     def move(self, dst_label):
-        old_label = self.label
-        dst, self.label = self.new_dir_and_label(dst_label)
+        dst, new_label = self.new_dir_and_label(dst_label)
         if dst == self.dir:
             return
         os.makedirs(dst, exist_ok=True)
-        shutil.move(self.dir+os.sep+self.filename,
-                    dst+os.sep+self.filename)
-        del self.reg[old_label][self.filename]
-        if not self.reg[old_label]:
-            del self.reg[old_label]
+        shutil.move(os.path.join(self.dir, self.filename), os.path.join(dst, self.filename))
+        self.reg_rem()
+        self.label = new_label
         self.dir = dst
-        self.reg.setdefault(self.label, {})[self.filename] = self
+        self.reg_add()
         
     def copy(self, dst_label):
         dst, new_label = self.new_dir_and_label(dst_label)
         if dst == self.dir:
             return
         os.makedirs(dst, exist_ok=True)
-        shutil.copy2(self.dir+os.sep+self.filename,
-                    dst+os.sep+self.filename)
-        new_obj = WebUIDownloaderFile(dst, self.filename, new_label)
-        self.reg.setdefault(new_label, {})[self.filename] = new_obj
+        shutil.copy2(os.path.join(self.dir, self.filename), os.path.join(dst, self.filename))
+        obj_new = WebUIDownloaderFile(dst, self.filename, new_label)
+        self.reg_add(obj=obj_new)
+        
+    def delete(self):
+        self.reg_rem()
+        os.remove(os.path.join(self.dir, self.filename))
         
     def new_dir_and_label(self, dst_label):
-        
-        # self.label point where the file should be saved for new downloaded files
-        # then self.label is the dictionary key pointer
+        ''' self.label point where the file should be saved for new downloaded files
+            then self.label is the dictionary key pointer '''
         
         if dst_label == "auto":
             # only for new downloaded files
@@ -192,7 +221,7 @@ class WebUIDownloaderFile(WebUIDownloader):
                 pth = PATHS.get("webui files", {}).get(self.label)
                 if pth is not None:
                     return self.root + pth, self.label
-            print("> can't determine where to save")
+            self.prnt("> can't determine where to save")
         elif dst_label in PATHS.get("webui files", []):
             pth = PATHS["webui files"][dst_label]
             return self.root + pth, dst_label
@@ -216,6 +245,7 @@ class WebUIDownloaderImages(WebUIDownloader):
     
     @classmethod
     def copy(cls, src_label, dst_label):
+        ''' for google drive '''
         src = PATHS["webui images"].get(src_label)
         if src:
             src = cls.root + src
@@ -239,7 +269,6 @@ class WebUIDownloaderImages(WebUIDownloader):
             os.makedirs(_p, exist_ok=True)
             for f in _copy[_p]:
                 shutil.copy2(f[0], f[1])
-            
         if not _copy:
             raise Exception("> files not found")
         
@@ -249,9 +278,13 @@ class WebUIDownloaderImages(WebUIDownloader):
         if src:
             src = cls.root + src
         else:
-            raise Exception(f'> wrong path\nscr: {src}')
-        !zip -rq "/content/img.zip" $src
-        files.download("/content/img.zip")
+            raise Exception(f'> wrong path\npath: {src}')
+        dst = PATHS["environment root"][cls.env] + os.sep + src_label
+        shutil.make_archive(base_name=dst, format="zip", root_dir=src)
+        if cls.env == "google": # WIP
+            from google.colab import files
+            files.download(dst + "zip")
+        cls.prnt(f"> {dst}")
 
 
 class WebUIDownloaderNew(WebUIDownloaderFile):
@@ -260,17 +293,17 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
     queue, queue_done, error_report = [], [], []
     
     def __init__(self, input_):
-        input_ = input_.strip()
+        self.input_ = input_.strip()
         
-        if input_ in self.queue_done:
-            # skip
+        if self.input_ in self.queue_done:
+            ''' for skip '''
             self.link, self.add, self.label = None, None, None
             return
         for k, v in CATALOG.items():
-            item = v.get(input_)
+            item = v.get(self.input_)
             if item is not None:
                 self.filename = item.get("filename")
-                # self.short = input_ if input_ != self.filename else None
+                # self.short = self.input_ if self.input_ != self.filename else None
                 self.link = item.get("link")
                 self.destination = item.get("dst")
                 self.add = item.get("add")
@@ -283,40 +316,38 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         else:
             self.filename = None
             # self.short = None # wip
-            self.link = input_ or None
+            self.link = self.input_ or None
             self.destination = None
             self.label = None
             self.add = None
         self.dir = None
         self.size = None
-        self.queue_done.append(input_)
+        self.queue_done.append(self.input_)
         
     def verify_filename(self, new_filename):
         ''' check name and extension of the downloaded file '''
         
-        if not new_filename.endswith(EXT):
-            print("\n>>> Not expected file extension\n"+
-                  f"file name: {new_filename}\n")
-            self.error_report.append(f"not expected file extension: {self.filename}")
+        if not new_filename.endswith(EXT) and not new_filename.endswith(ZIP):
+            self.prnt("\n>>> Not expected file extension\n"+
+                      f"file name: {new_filename}\n")
+            self.error_report.append("not expected file extension: "+
+                                     f"{self.filename or self.link or new_filename}")
         if self.filename is None:
             return
-        if self.filename.endswith(EXT):
-            self.filename = self.filename.rsplit('.', 1)[0]
-        if self.filename.lower() != new_filename.rsplit('.', 1)[0].lower():
-            print("\n>>> Not expected file name\n"+
-                  f"file name: {new_filename}\nexpect: {self.filename}\n")
-            self.error_report.append(f"not expected file name: {self.filename}")
+        tmp_filename = self.filename.rsplit('.', 1)[0]
+        if tmp_filename.lower() != new_filename.rsplit('.', 1)[0].lower():
+            self.prnt("\n>>> Not expected file name\n"+
+                      f"file name: {new_filename}\nexpect: {tmp_filename}\n")
+            self.error_report.append("not expected file name: "+
+                                     f"{self.filename} -> {new_filename}")
         
     def get_dir(self, dst=None, colab_root_check=True):
-        ''' check that the file exists at the destination path
-            save path to self.dir variable
-            in colab getcwd() sometimes return "/root" instead of "/content" '''
-        
         if dst is None:
             self.dir = os.getcwd()
             if colab_root_check:
+                ''' in colab os.getcwd() sometimes return "/root" '''
                 if (self.dir+"/").startswith("/root/"):
-                    self.dir = "/content" + self.dir[5:]
+                    self.dir = PATHS["environment root"][self.env] + self.dir[5:]
         else:
             self.dir = dst
         if not os.path.isfile(self.dir + os.sep + self.filename):
@@ -334,36 +365,39 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             self.verify_filename(new_filename)
             self.filename = new_filename
             self.get_dir(dst)
-            self.size = self.get_size() if size is None else size
-            self.file_add()
-            print("-"*30, f"> {self.dir}{os.sep}{self.filename}",
-                  "> download done", "-"*30+"\n\n", sep="\n")
+            if not self.unzip_file():
+                self.size = self.get_size() if size is None else size
+                self.reg_add()
+            self.prnt("-"*30, f"> {self.dir}{os.sep}{self.filename}",
+                      "> download done", "-"*30+"\n\n", sep="\n")
         if self.add is not None:
             self.queue.extend([a, dst_label, self.label] for a in self.add.split(","))
         if self.queue:
+            time.sleep(2)
             nxt = self.queue.pop(0)
             type(self)(nxt[0]).download(nxt[1], initial_label=nxt[2])
         else:
             self.queue_done.clear()
+            self.prnt("="*30)
             if self.error_report:
-                print ("\n>>> report:")
-                for e in self.error_report: print(f"  {e}")
+                self.prnt("\n\n>>> report:")
+                for e in self.error_report: self.prnt(f"  {e}")
                 self.error_report.clear()
         
     def download_switch(self, link, dst_label, **kw):
-        ''' recognize the link and send it further for downloading '''
+        ''' recognize link type and send it further for downloading '''
         
         if link is None:
             return None, None, None
-        elif kw and 'type' in kw:
-            # for civitai popup download
+        elif "tpe" in kw:
+            ''' for civitai popup download '''
             return self.d_civitai(id_=link, dst_label=dst_label,
                                   popup_download=True, **kw)
         elif link.isdigit():
-            # civitai model version id
+            ''' civitai model version id '''
             return self.d_civitai(id_=link, dst_label=dst_label)
         elif 25<=len(link)<=33 and not link.startswith('https'):
-            # google drive file id
+            ''' google drive file id '''
             return self.d_google_drive(link, dst_label)
         elif link.startswith('https://drive.google.com/'):
             return self.d_google_drive(link, dst_label)
@@ -374,22 +408,22 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         elif link.startswith('https://mega.nz/'):
             return self.d_mega(link, dst_label)
         else:
-            print ("-"*30, f">>> unknown link type:\n{link}",
-                   "-"*30+"\n\n", sep="\n")
+            self.prnt("-"*30, f">>> unknown link type:\n{link}",
+                      "-"*30+"\n\n", sep="\n")
             self.error_report.append(f"unknown link type: {link}")
             return None, None, None
         
     def d_huggingface(self, link, dst_label):
-        print ('\n> download from huggingface.co\n')
+        self.prnt('\n> download from huggingface.co\n')
         dst, self.label = self.new_dir_and_label(dst_label)
         hf_token = WebUIDownloaderGUI.hf_token.value.strip()
         if not hf_token:
-            print('> no Hugging Face token')
+            self.prnt('> no Hugging Face token')
         h = {"Authorization": f"Bearer {hf_token}"}
         return self.d_requests_get_file(link, dst=dst, headers=h)
         
     def d_google_drive(self, id_, dst_label):
-        print ('\n> download from google drive\n')
+        self.prnt('\n> download from google drive\n')
         dst, self.label = self.new_dir_and_label(dst_label)
         output=dst
         if output and not output.endswith(os.sep):
@@ -399,28 +433,33 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             if tmp is not None:
                 id_ = tmp.group()
             else:
-                raise Exception(f'> google drive link error:\n{id_}')
-        print(f'> save to: {self.label}')
+                self.error_report.append(f"gdown link error: {self.input_}\n{id_}")
+                return None, None, None
+        self.prnt(f'> save to: {self.label}')
         filename = gdown.download(id=id_, output=output)
-        filename = filename.rsplit(os.sep, 1)[-1]
-        print()
+        if filename:
+            filename = filename.rsplit(os.sep, 1)[-1]
+        else:
+            self.error_report.append(f"gdown error: {self.input_}")
+            return None, None, None
+        self.prnt('')
         return filename, None, dst
         
     def d_mega(self, link, dst_label):
-        print ("\n> download from mega.nz\n")
+        self.prnt("\n> download from mega.nz\n")
         dst, self.label = self.new_dir_and_label(dst_label)
-        print(f"> save to   : {self.label}\n")
+        self.prnt(f"> save to   : {self.label}\n")
         MegaD.download(link, dst)
-        type(self).upd_reg()
-        print("\n")
+        type(self).fill_reg()
+        self.prnt("\n")
         return None, None, None
         
     def d_civitai(self, id_=None, link=None, dst_label=None, idm=None,
-                        type=None, prm=None, popup_download=False):
-        ''' id_ = modelVersionId, idm = modelId '''
+                        tpe=None, prm=None, popup_download=False):
+        ''' "id_" = modelVersionId, "idm" = modelId '''
         
         if not popup_download:
-            print ('\n> download from civitai.com\n')
+            self.prnt('\n> download from civitai.com\n')
             
             if link is not None:
                 id_, idm, prm = self.d_civitai_pars_link(link)
@@ -429,26 +468,26 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                 civitai_model = self.d_requests_get_json(
                                 f"https://civitai.com/api/v1/models/{idm}")
                 id_ = str(civitai_model["modelVersions"][0]["id"])
-                type = civitai_model["type"].lower()
+                tpe = civitai_model["type"].lower()
                 files = civitai_model["modelVersions"][0]["files"]
             elif id_:
                 civitai_model_v = self.d_requests_get_json(
                                f"https://civitai.com/api/v1/model-versions/{id_}")
-                type = civitai_model_v["model"]["type"].lower()
+                tpe = civitai_model_v["model"]["type"].lower()
                 files = civitai_model_v["files"]
                 
                 if prm and len(files) > 1:
                     prm_type = prm.get("type", "").lower()
                     if prm_type != "model":
-                        type = civitai_type_map.get(prm_type) or type
+                        tpe = civitai_type_map.get(prm_type) or tpe
                 
             if not prm and len(files) > 1:
                 to_popup_menu = []
                 for f in files:
                     kb = f["sizeKB"]
                     dst_type = f["type"].lower()
-                    if type and type != "checkpoint" and dst_type == "model":
-                        dst_type = civitai_type_map.get(type) or "root"
+                    if tpe and tpe != "checkpoint" and dst_type == "model":
+                        dst_type = civitai_type_map.get(tpe) or "root"
                     else:
                         dst_type = civitai_type_map.get(dst_type) or "root"
                     to_popup_menu.append({
@@ -461,10 +500,10 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                 WebUIDownloaderGUI.popup_menu(to_popup_menu)
                 return None, None, None
             
-        print (f"> civitai model version id : {id_}",
-               f"> civitai model type       : {type}\n", sep="\n")
+        self.prnt(f"> civitai model version id : {id_}",
+                  f"> civitai model type       : {tpe}\n", sep="\n")
         if dst_label == "auto" and self.destination is None:
-            dst_label = civitai_type_map.get(type) or dst_label
+            dst_label = civitai_type_map.get(tpe) or dst_label
         dst, self.label = self.new_dir_and_label(dst_label)
         link = f"https://civitai.com/api/download/models/{id_}"
         return self.d_requests_get_file(link, dst=dst, params=prm)
@@ -525,8 +564,8 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         tik = 100/(file_bytes/chunk) if file_bytes > chunk else 0
         progress, display_at = 0, 5
         
-        print(f'> file name : {filename}', f"> save to   : {self.label}",
-              f"> size      : {size} mb", sep="\n")
+        self.prnt(f'> file name : {filename}', f"> save to   : {self.label}",
+                  f"> size      : {size} mb", sep="\n")
         with open(out, "wb") as file:
             for block in r.iter_content(chunk_size = chunk):
                 if block:
@@ -534,10 +573,25 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                     progress += tik
                     if progress > display_at:
                         display_at += 5
-                        print(f"\r{int(progress)}%", end="")
+                        self.prnt(f"\r{int(progress)}%", end="")
             else:
-                print('\r100%')
+                self.prnt('\r100%')
         return filename, size, dst
+        
+    def unzip_file(self):
+        if not self.do_unzip or not self.filename.endswith(ZIP):
+            return
+        self.prnt(f"> unzip {self.filename}")
+        ld = os.listdir(self.dir)
+        zip_path = self.dir+os.sep+self.filename
+        shutil.unpack_archive(zip_path, self.dir)
+        for n in [f for f in os.listdir(self.dir) if f not in ld]:
+            self.prnt(" " + n)
+            if n.endswith(EXT):
+                WebUIDownloaderFile(self.dir, n, self.label).reg_add()
+        if self.remove_zip:
+            os.remove(zip_path)
+            return True
 
 
 # ===========================
@@ -545,12 +599,17 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
 # ===========================
 
 class WebUIDownloaderGUI:
-
+    
     gd_state = None
     disabled = []
+    popup_menus = {}
+    out = wgt.Output(layout={'border': '1px solid black'})
     
     @classmethod
     def __init__(cls):
+        
+        cls.env = WebUIDownloader.env
+        cls.prnt = cls.env_print(cls.env)
         
         # --- input ---
         
@@ -558,10 +617,9 @@ class WebUIDownloaderGUI:
         cls.ui_input.append(wgt.Text(description = "link:"))
         for u in CATALOG.keys():
             cls.ui_input.append(
-                wgt.Dropdown(
-                    options = ("",) + tuple(CATALOG[u]),
-                    description = f"{u}:",)
-                )
+                wgt.Dropdown(options = ("",) + tuple(CATALOG[u]),
+                             description = f"{u}:",)
+            )
         cls.rb_input = wgt.RadioButtons(
                        options = tuple(u for u in cls.ui_input),
                        layout={'width': '25px'}
@@ -596,31 +654,35 @@ class WebUIDownloaderGUI:
         
         # --- buttons ---
         
-        lyt = wgt.Layout(display           = "flex",
-                         justify_content   = "center",
-                         margin            = "5px 0 10px 90px")
-        stl = wgt.ButtonStyle(button_color = "#e0e0e0")
+        lyt_fle = wgt.Layout(display           = "flex",
+                             justify_content   = "center",
+                             margin            = "5px -80px 10px 90px",
+                             width = "64px")
+        cls.lyt = wgt.Layout(display           = "flex",
+                             justify_content   = "center",
+                             margin            = "5px 0 10px 90px")
+        cls.stl = wgt.ButtonStyle(button_color = "#e0e0e0")
         
         btn_Download    = wgt.Button(description = "Download",
-                                     layout = lyt, style = stl)
+                                     layout = cls.lyt, style = cls.stl)
         btn_Refresh     = wgt.Button(description = "Refresh files",
-                                     layout = lyt, style = stl )
+                                     layout = cls.lyt, style = cls.stl,
+                                     tooltip= "Use if files are added manually")
         btn_Move        = wgt.Button(description = "Move",
-                                     layout = lyt, style = stl )
+                                     layout = lyt_fle, style = cls.stl)
         btn_Copy        = wgt.Button(description = "Copy",
-                                     layout = lyt, style = stl )
-        btn_Zip         = wgt.Button(description = "Zip and download",
-                                     layout = lyt, style = stl,
-                                     tooltip= "Zip folder and download")
+                                     layout = lyt_fle, style = cls.stl)
+        btn_Del         = wgt.Button(description = "Delete",
+                                     layout = lyt_fle, style = {"button_color":"#f2d3d3"})
+        btn_Zip         = wgt.Button(description = "Zip folder",
+                                     layout = cls.lyt, style = cls.stl)
         cls.btn_M_login = wgt.Button(description = "Mega login",
-                                     layout = lyt, style = {'button_color':"#e0e0e0"})
+                                     layout = cls.lyt, style = {'button_color':"#e0e0e0"})
         cls.btn_M_upld  = wgt.Button(description = "Upload to Mega",
-                                     layout = lyt, style = stl,
+                                     layout = cls.lyt, style = cls.stl,
                                      tooltip= "Login to Mega first")
-        cls.btn_Dwnld_p = wgt.Button(description = "Download",
-                                     layout = lyt, style = stl)
-        cls.btn_Copy_i  = wgt.Button(description = "Copy images",
-                                     layout = lyt, style = stl,
+        cls.btn_Copy_i  = wgt.Button(description = "Copy to Google Drive",
+                                     layout = cls.lyt, style = cls.stl,
                                      tooltip= "Google drive must be mounted")
         cls.btn_GDrive  = wgt.Button(description = "g",
                                      layout = wgt.Layout(
@@ -636,29 +698,30 @@ class WebUIDownloaderGUI:
         btn_Refresh.on_click(cls.reset_click)
         btn_Move.on_click(cls.move_click)
         btn_Copy.on_click(cls.copy_click)
+        btn_Del.on_click(cls.delete_click)
         btn_Zip.on_click(cls.zip_and_download_click)
         cls.btn_M_login.on_click(cls.mega_login_click)
         cls.btn_M_upld.on_click(cls.mega_upload_click)
-        cls.btn_Dwnld_p.on_click(cls.download_popup_click)
         cls.btn_Copy_i.on_click(cls.copy_img_click)
         cls.btn_GDrive.on_click(cls.google_drive_mount)
         
         # --- containers ---
         
-        cls.to_dis  = [cls.btn_GDrive, cls.btn_Copy_i, btn_Zip,
-                       cls.btn_Dwnld_p, btn_Download, btn_Refresh,
-                       btn_Move, btn_Copy, cls.btn_M_login, cls.btn_M_upld]
+        ''' all buttons disabled state '''
+        cls.to_dis  = [cls.btn_GDrive, cls.btn_Copy_i, btn_Zip, btn_Del,
+                       btn_Download, btn_Refresh, btn_Move, btn_Copy,
+                       cls.btn_M_login, cls.btn_M_upld]
+        ''' Hugging Face token '''
         cls.key_hf  = wgt.Accordion(children = [cls.hf_token],
                                     selected_index = None,
-                                    layout = wgt.Layout(
-                                             width = "340px",
-                                             margin = "15px 0 0 0"))
-        
+                                    layout = wgt.Layout(width = "340px",
+                                                        margin = "15px 0 0 0"))
         box_dwnld  = wgt.VBox([wgt.HBox([wgt.VBox(cls.ui_input),
                                          wgt.VBox([cls.rb_input])]),
                                cls.dst_d, btn_Download, cls.key_hf])
         box_files  = wgt.VBox([wgt.HBox([btn_Refresh,cls.btn_GDrive]),
-                               cls.files, cls.dst_m, btn_Move, btn_Copy])
+                               cls.files, cls.dst_m,
+                               wgt.HBox([btn_Move, btn_Copy, btn_Del])])
         box_images = wgt.VBox([wgt.HBox([btn_Zip, cls.btn_GDrive]),
                                cls.images, cls.dst_i, cls.btn_Copy_i])
         box_mega   = wgt.VBox([btn_Refresh, cls.files, cls.btn_M_upld,
@@ -679,21 +742,33 @@ class WebUIDownloaderGUI:
         # --- init state ---
         
         cls.google_drive_state_switch()
-        WebUIDownloader.upd_reg(gd=cls.gd_state)
+        WebUIDownloader.fill_reg(gd=cls.gd_state)
         cls.upd_files_menu()
-        if os.path.exists("/root/.megaCmd/session"):
+        if os.path.exists("/root/.megaCmd/session"): # WIP IDK root for kaggle
             cls.btn_M_login.style.button_color="#80baff"
             cls.btn_M_upld.tooltip = ""
         else:
             cls.btn_M_login.style.button_color="#e0e0e0"
             cls.btn_M_upld.disabled = True
+        
+    # --- environment behavior ---
+    
+    @classmethod
+    def env_print(cls, env):
+        if env == "sagemaker":
+            def p(*args, **kwargs):
+                with cls.out: print(*args[1 if len(args)>1 else 0:], **kwargs)
+            return p
+        else:
+            return print
     
     # --- popup menu ---
     
     @classmethod
+    @out.capture()
     def popup_menu(cls, files_list):
-        cls.popup_files = files_list
-        cls.popup_dropdown = []
+        if cls.env == "google": time.sleep(1)
+        dropdown_tmp = []
         opt = ("> DO NOT DOWNLOAD <",)+tuple(PATHS.get("webui files",()))
         for f in files_list:
             tmp_info = wgt.HTML(
@@ -707,41 +782,57 @@ class WebUIDownloaderGUI:
                         value = val if val in opt else "root",
                         description = "Download to:",
                         layout = wgt.Layout(margin = "0 0 40px 0"))
+            dropdown_tmp.append(tmp_dd)
             display(tmp_info, tmp_dd)
-            cls.popup_dropdown.append(tmp_dd)
-        display(cls.btn_Dwnld_p)
-        print()
-    
+            if cls.env == "google": time.sleep(1)
+        
+        btn_Dwnld_p = wgt.Button(description = "Download", disabled=True,
+                                 layout = cls.lyt, style = cls.stl)
+        btn_Dwnld_p.on_click(cls.download_popup_click)
+        cls.disabled.append(btn_Dwnld_p)
+        cls.to_dis.append(btn_Dwnld_p)
+        
+        cls.popup_menus[btn_Dwnld_p] = {'dropdown':dropdown_tmp, 'files':files_list}
+        display(btn_Dwnld_p)
+        cls.prnt('')
+        
     # --- actions ---
     
     @classmethod
     def download_click(cls, b):
         f = cls.rb_input.value.value.strip()
         if f:
-            output.clear()
-            cls.display()
+            if cls.popup_menus:
+                cls.to_dis = cls.to_dis[:-len(cls.popup_menus)]
+                cls.popup_menus.clear()
+            clear_output()
+            cls.display_gui()
             cls.btn_disabled(True)
             try:
                 WebUIDownloaderNew(f).download(cls.dst_d.value)
             except Exception as ex:
-                print(ex)
+                cls.prnt(ex)
             cls.upd_files_menu()
             cls.btn_disabled(False)
         
     @classmethod
     def download_popup_click(cls, b):
         cls.btn_disabled(True)
-        for i, dst in enumerate(cls.popup_dropdown):
+        dropdown_tmp = cls.popup_menus[b]['dropdown']
+        files_tmp = cls.popup_menus[b]['files']
+        for i, dst in enumerate(dropdown_tmp):
             if dst.value == '> DO NOT DOWNLOAD <':
                 continue
-            f = cls.popup_files[i]
+            f = files_tmp[i]
             try:
                 # f["id"] = modelVersionId
                 WebUIDownloaderNew(f["id"]).download(dst.value,
                                                      prm=f["params"],
-                                                     type=f["type"])
+                                                     tpe=f["type"])
             except Exception as ex:
-                print(ex)
+                cls.prnt(ex)
+        if not b.description.endswith("(done)"):
+            b.description += " (done)"
         cls.upd_files_menu()
         cls.btn_disabled(False)
         
@@ -749,15 +840,15 @@ class WebUIDownloaderGUI:
     def move_click(cls, b):
         if not cls.files.value:
             return
-        output.clear()
-        cls.display()
+        clear_output()
+        cls.display_gui()
         cls.btn_disabled(True)
-        print ('\n> move file...')
+        cls.prnt('\n> move file...')
         try:
             cls.files.value.move(cls.dst_m.value)
-            print ('\n> move done')
+            cls.prnt('\n> move done')
         except Exception as e:
-            print (e)
+            cls.prnt(e)
         cls.upd_files_menu()
         cls.btn_disabled(False)
         
@@ -765,15 +856,15 @@ class WebUIDownloaderGUI:
     def copy_click(cls, b):
         if not cls.files.value:
             return
-        output.clear()
-        cls.display()
+        clear_output()
+        cls.display_gui()
         cls.btn_disabled(True)
-        print ('\n> copy file...')
+        cls.prnt('\n> copy file...')
         try:
             cls.files.value.copy(cls.dst_m.value)
-            print ('\n> copy done')
+            cls.prnt('\n> copy done')
         except Exception as e:
-            print (e)
+            cls.prnt(e)
         cls.upd_files_menu()
         cls.btn_disabled(False)
         
@@ -782,12 +873,12 @@ class WebUIDownloaderGUI:
         if not cls.images.value:
             return
         cls.btn_disabled(True)
-        print ('\n> img copy...')
+        cls.prnt('\n> img copy...')
         try:
             WebUIDownloaderImages.copy(cls.images.value, cls.dst_i.value)
-            print ('\n> img copy done')
+            cls.prnt('\n> img copy done')
         except Exception as e:
-            print (e)
+            cls.prnt(e)
         cls.btn_disabled(False)
         
     @classmethod
@@ -795,33 +886,48 @@ class WebUIDownloaderGUI:
         if not cls.images.value:
             return
         cls.btn_disabled(True)
-        print ('\n> zip img...')
+        cls.prnt('\n> zip img...')
         try:
             WebUIDownloaderImages.zip_and_download(cls.images.value)
-            print ('\n> zip done')
+            cls.prnt('\n> zip done')
         except Exception as e:
-            print (e)
+            cls.prnt(e)
         cls.btn_disabled(False)
         
     @classmethod
     def reset_click(cls, b):
-        output.clear()
+        clear_output()
         cls.btn_disabled(True)
         #cls.google_drive_state_switch()
-        WebUIDownloader.upd_reg(gd=cls.gd_state)
+        WebUIDownloader.fill_reg(gd=cls.gd_state)
         cls.upd_files_menu()
-        cls.display()
+        cls.display_gui()
+        cls.btn_disabled(False)
+    
+    @classmethod
+    def delete_click(cls, b):
+        if not cls.files.value:
+            return
+        cls.btn_disabled(True)
+        cls.prnt('\n> delete file...')
+        try:
+            cls.files.value.delete()
+            cls.prnt('\n> delete done')
+        except Exception as e:
+            cls.prnt(e)
+        cls.upd_files_menu()
         cls.btn_disabled(False)
         
     @classmethod
     def google_drive_mount(cls, b):
         if not os.path.isdir(WebUIDownloader.mountpoint):
             cls.btn_disabled(True)
-            print ('> mount google drive')
+            cls.prnt('> mount google drive')
             try:
+                from google.colab import drive
                 drive.mount(WebUIDownloader.mountpoint)
             except Exception as e:
-                print(e)
+                cls.prnt(e)
             cls.btn_disabled(False)
             if not os.path.isdir(WebUIDownloader.mountpoint):
                 cls.google_drive_state_switch(False)
@@ -830,6 +936,10 @@ class WebUIDownloaderGUI:
         
     @classmethod
     def google_drive_state_switch(cls, state=None):
+        if cls.env != "google":
+            cls.btn_GDrive.disabled = True
+            cls.btn_Copy_i.disabled = True
+            return
         if state is None:
             if os.path.isdir(WebUIDownloader.mountpoint):
                 state = True
@@ -839,12 +949,11 @@ class WebUIDownloaderGUI:
             cls.gd_state = True
             cls.btn_Copy_i.disabled = False
             cls.btn_GDrive.style.button_color='#80baff'
-            cls.upd_move_menu()
         elif not state and cls.gd_state != False:
             cls.gd_state = False
             cls.btn_Copy_i.disabled = True
             cls.btn_GDrive.style.button_color='#e0e0e0'
-            cls.upd_move_menu()
+        cls.upd_move_menu()
         
     @classmethod
     def mega_login_click(cls, b):
@@ -853,41 +962,41 @@ class WebUIDownloaderGUI:
         if not l or not p:
             return
             
-        output.clear()
-        cls.display()
+        clear_output()
+        cls.display_gui()
         cls.btn_disabled(True, skip=cls.btn_M_upld)
         if os.path.exists("/root/.megaCmd/session"):
-            print ('\n> mega relogin...\n')
+            cls.prnt('\n> mega relogin...\n')
             MegaD.logout()
             cls.btn_M_login.style.button_color='#e0e0e0'
             cls.btn_M_upld.disabled = True
         else:
-            print ('\n> mega login...\n')
+            cls.prnt('\n> mega login...\n')
         if MegaD.login(l, p) == 0:
             cls.btn_M_login.style.button_color='#80baff'
             cls.btn_M_upld.disabled = False
-            print ('\n> login done')
+            cls.prnt('\n> login done')
         cls.btn_disabled(False)
         
     @classmethod
     def mega_upload_click(cls, b):
         if not cls.files.value:
             return
-        output.clear()
-        cls.display()
+        clear_output()
+        cls.display_gui()
         cls.btn_disabled(True)
-        print ('\n> upload file to mega...\n')
+        cls.prnt('\n> upload file to mega...\n')
         try:
             f = cls.files.value.dir+os.sep+cls.files.value.filename
             MegaD.upload(f)
-            print ('\n> upload done')
+            cls.prnt('\n> upload done')
         except Exception as e:
-            print (e)
+            cls.prnt(e)
         cls.btn_disabled(False)
         
     @classmethod
     def btn_disabled(cls, state, skip=None):
-        ''' disables all objects from "to_dis" list that are enabled
+        ''' disables all enabled objects from "to_dis" list
             skip - do not add object to the "disabled" list '''
         
         if state:
@@ -914,8 +1023,9 @@ class WebUIDownloaderGUI:
             cls.dst_m.options += tuple(WebUIDownloader.gd_PATHS)
         
     @classmethod
-    def display(cls):
-        display(cls.add_style, cls.tab)
+    def display_gui(cls):
+        cls.out.clear_output()
+        display(cls.add_style, cls.tab, cls.out)
 
 
 # ===========================
@@ -1019,5 +1129,4 @@ class MegaD:
 # ===========================
 
 WebUIDownloader()
-WebUIDownloaderGUI()
-WebUIDownloaderGUI.display()
+WebUIDownloaderGUI().display_gui()
