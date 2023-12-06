@@ -48,7 +48,8 @@ PATHS = {
         "txt2img-gr" : "/outputs/txt2img-grids",
         "img2img-gr" : "/outputs/img2img-grids",
         "log-images" : "/log/images",
-        "my_dir"     : "/img_out",
+        "log_all"    : "/log",
+        "my_dir"     : "/my_dir",
 },
 "webui files"        : {
         "root"       : "", # don't change it
@@ -87,7 +88,7 @@ if 'do_once' not in dir():
     import os, re, shutil, requests, gdown, time
     import subprocess, shlex, contextlib # for Mega
     import ipywidgets as wgt
-    from IPython.display import display, HTML, clear_output, FileLink
+    from IPython.display import display, HTML, clear_output
     if 'CATALOG' not in dir(): CATALOG = {}
     clear_output()
 
@@ -108,7 +109,7 @@ class WebUIDownloader:
         
         if "COLAB_RELEASE_TAG" in os.environ:
             cls.env = "google"
-        elif "HOME" in os.environ and "studio-lab" in os.environ["HOME"]:
+        elif "studio-lab" in os.environ.get("HOME", ""):
             cls.env = "sagemaker"
         else:
             raise Exception("ERROR: can't determine environment")
@@ -357,11 +358,12 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
     def download(self, dst_label, **kw):
         ''' main download method '''
         
+        self.prnt(f"> {self.link}" if self.link else "", end="")
         if 'initial_label' in kw:
             self.label = self.label or kw['initial_label']
         new_filename, size, dst = self.download_switch(self.link,
                                                        dst_label, **kw)
-        if new_filename is not None:
+        if new_filename:
             self.verify_filename(new_filename)
             self.filename = new_filename
             self.get_dir(dst)
@@ -370,6 +372,8 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                 self.reg_add()
             self.prnt("-"*30, f"> {self.dir}{os.sep}{self.filename}",
                       "> download done", "-"*30+"\n\n", sep="\n")
+        elif new_filename is not False:
+            self.prnt("-"*30, "> download NOT done", "-"*30+"\n\n", sep="\n")
         if self.add is not None:
             self.queue.extend([a, dst_label, self.label] for a in self.add.split(","))
         if self.queue:
@@ -380,49 +384,48 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             self.queue_done.clear()
             self.prnt("="*30)
             if self.error_report:
-                self.prnt("\n\n>>> report:")
-                for e in self.error_report: self.prnt(f"  {e}")
+                self.prnt("\n\n>>> report:", *self.error_report, sep="\n\n")
                 self.error_report.clear()
         
     def download_switch(self, link, dst_label, **kw):
         ''' recognize link type and send it further for downloading '''
         
         if link is None:
-            return None, None, None
+            return False, None, None
         elif "tpe" in kw:
             ''' for civitai popup download '''
-            return self.d_civitai(id_=link, dst_label=dst_label,
+            return self.civitai_get(id_=link, dst_label=dst_label,
                                   popup_download=True, **kw)
         elif link.isdigit():
             ''' civitai model version id '''
-            return self.d_civitai(id_=link, dst_label=dst_label)
+            return self.civitai_get(id_=link, dst_label=dst_label)
         elif 25<=len(link)<=33 and not link.startswith('https'):
             ''' google drive file id '''
-            return self.d_google_drive(link, dst_label)
+            return self.google_get(link, dst_label)
         elif link.startswith('https://drive.google.com/'):
-            return self.d_google_drive(link, dst_label)
+            return self.google_get(link, dst_label)
         elif link.startswith('https://civitai.com/'):
-            return self.d_civitai(link=link, dst_label=dst_label)
+            return self.civitai_get(link=link, dst_label=dst_label)
         elif link.startswith('https://huggingface.co/'):
-            return self.d_huggingface(link, dst_label)
+            return self.huggingface_get(link, dst_label)
         elif link.startswith('https://mega.nz/'):
-            return self.d_mega(link, dst_label)
+            return self.mega_get(link, dst_label)
         else:
             self.prnt("-"*30, f">>> unknown link type:\n{link}",
                       "-"*30+"\n\n", sep="\n")
             self.error_report.append(f"unknown link type: {link}")
             return None, None, None
         
-    def d_huggingface(self, link, dst_label):
+    def huggingface_get(self, link, dst_label):
         self.prnt('\n> download from huggingface.co\n')
         dst, self.label = self.new_dir_and_label(dst_label)
         hf_token = WebUIDownloaderGUI.hf_token.value.strip()
         if not hf_token:
             self.prnt('> no Hugging Face token')
         h = {"Authorization": f"Bearer {hf_token}"}
-        return self.d_requests_get_file(link, dst=dst, headers=h)
+        return self.requests_get_file(link, dst=dst, headers=h)
         
-    def d_google_drive(self, id_, dst_label):
+    def google_get(self, id_, dst_label):
         self.prnt('\n> download from google drive\n')
         dst, self.label = self.new_dir_and_label(dst_label)
         output=dst
@@ -445,16 +448,16 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         self.prnt('')
         return filename, None, dst
         
-    def d_mega(self, link, dst_label):
+    def mega_get(self, link, dst_label):
         self.prnt("\n> download from mega.nz\n")
         dst, self.label = self.new_dir_and_label(dst_label)
         self.prnt(f"> save to   : {self.label}\n")
         MegaD.download(link, dst)
         type(self).fill_reg()
         self.prnt("\n")
-        return None, None, None
+        return False, None, None
         
-    def d_civitai(self, id_=None, link=None, dst_label=None, idm=None,
+    def civitai_get(self, id_=None, link=None, dst_label=None, idm=None,
                         tpe=None, prm=None, popup_download=False):
         ''' "id_" = modelVersionId, "idm" = modelId '''
         
@@ -462,16 +465,16 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             self.prnt('\n> download from civitai.com\n')
             
             if link is not None:
-                id_, idm, prm = self.d_civitai_pars_link(link)
+                id_, idm, prm = self.civitai_pars_link(link)
             
             if idm:
-                civitai_model = self.d_requests_get_json(
+                civitai_model = self.requests_get_json(
                                 f"https://civitai.com/api/v1/models/{idm}")
                 id_ = str(civitai_model["modelVersions"][0]["id"])
                 tpe = civitai_model["type"].lower()
                 files = civitai_model["modelVersions"][0]["files"]
             elif id_:
-                civitai_model_v = self.d_requests_get_json(
+                civitai_model_v = self.requests_get_json(
                                f"https://civitai.com/api/v1/model-versions/{id_}")
                 tpe = civitai_model_v["model"]["type"].lower()
                 files = civitai_model_v["files"]
@@ -506,10 +509,10 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             dst_label = civitai_type_map.get(tpe) or dst_label
         dst, self.label = self.new_dir_and_label(dst_label)
         link = f"https://civitai.com/api/download/models/{id_}"
-        return self.d_requests_get_file(link, dst=dst, params=prm)
+        return self.requests_get_file(link, dst=dst, params=prm)
         
     @staticmethod
-    def d_civitai_pars_link(link):
+    def civitai_pars_link(link):
         id_ = re.search("(?<=modelVersionId=)\d+", link)
         if id_ is not None:
             return id_.group(), None, None
@@ -526,14 +529,21 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                 return None, idm.group(), None
         raise Exception(f"> civitai link error:\n{link}")
         
-    def d_requests_get_json(self, link):
+    def civitai_denied(self, link, requests_obj):
+        msg = "The creator of this asset requires you to be logged in to download it"
+        if hasattr(requests_obj, "text") and msg in requests_obj.text:
+            self.prnt(msg)
+            self.error_report.append(f"{link}\n{msg}")
+            return True
+        
+    def requests_get_json(self, link):
         r = requests.get(link)
         if r.status_code != 200:
-            raise Exception(f'> status code: {r.status_code}\n'+
+            raise Exception(f"> status code: {r.status_code}\n"+
                             str(r.content)[:150])
         return r.json()
         
-    def d_requests_get_file(self, link, dst=None, headers=None, params=None):
+    def requests_get_file(self, link, dst=None, headers=None, params=None):
         r = requests.get(link, headers=headers, stream=True, params=params)
         if r.status_code != 200:
             raise Exception(f"> status code: {r.status_code}\n"+
@@ -544,7 +554,9 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             if link.endswith(EXT):
                 filename = link.rsplit('/')[-1]
             else:
-                raise Exception("> download error (EXT)")
+                if self.civitai_denied(link, r):
+                    return None, None, None
+                raise Exception("> download error (extension\\response)")
         else:
             tmp = re.search('(?<=filename=")[^"]+', filename)
             if tmp is not None:
@@ -564,7 +576,7 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         tik = 100/(file_bytes/chunk) if file_bytes > chunk else 0
         progress, display_at = 0, 5
         
-        self.prnt(f'> file name : {filename}', f"> save to   : {self.label}",
+        self.prnt(f"> file name : {filename}", f"> save to   : {self.label}",
                   f"> size      : {size} mb", sep="\n")
         with open(out, "wb") as file:
             for block in r.iter_content(chunk_size = chunk):
@@ -575,7 +587,7 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                         display_at += 5
                         self.prnt(f"\r{int(progress)}%", end="")
             else:
-                self.prnt('\r100%')
+                self.prnt("\r100%")
         return filename, size, dst
         
     def unzip_file(self):
@@ -603,7 +615,7 @@ class WebUIDownloaderGUI:
     gd_state = None
     disabled = []
     popup_menus = {}
-    out = wgt.Output(layout={'border': '1px solid black'})
+    out = wgt.Output(layout={"border": "1px solid black"})
     
     @classmethod
     def __init__(cls):
@@ -625,7 +637,7 @@ class WebUIDownloaderGUI:
                        layout={'width': '25px'}
                        )
         if len(cls.ui_input) == 1:
-            cls.rb_input.layout.visibility = 'hidden'
+            cls.rb_input.layout.visibility = "hidden"
             
         cls.files = wgt.Dropdown(
                     options = WebUIDownloader.get_files_menu(),
