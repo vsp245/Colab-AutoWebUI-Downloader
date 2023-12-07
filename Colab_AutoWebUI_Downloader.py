@@ -420,9 +420,7 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         self.prnt('\n> download from huggingface.co\n')
         dst, self.label = self.new_dir_and_label(dst_label)
         hf_token = WebUIDownloaderGUI.hf_token.value.strip()
-        if not hf_token:
-            self.prnt('> no Hugging Face token')
-        h = {"Authorization": f"Bearer {hf_token}"}
+        h = {"Authorization": f"Bearer {hf_token}"} if hf_token else None
         return self.requests_get_file(link, dst=dst, headers=h)
         
     def google_get(self, id_, dst_label):
@@ -458,12 +456,11 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         return False, None, None
         
     def civitai_get(self, id_=None, link=None, dst_label=None, idm=None,
-                        tpe=None, prm=None, popup_download=False):
+                          tpe=None, prm=None, popup_download=False):
         ''' "id_" = modelVersionId, "idm" = modelId '''
         
         if not popup_download:
             self.prnt('\n> download from civitai.com\n')
-            
             if link is not None:
                 id_, idm, prm = self.civitai_pars_link(link)
             
@@ -478,7 +475,6 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                                f"https://civitai.com/api/v1/model-versions/{id_}")
                 tpe = civitai_model_v["model"]["type"].lower()
                 files = civitai_model_v["files"]
-                
                 if prm and len(files) > 1:
                     prm_type = prm.get("type", "").lower()
                     if prm_type != "model":
@@ -501,15 +497,19 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                         "params": {"type": f["type"], "format": f["metadata"]["format"]},
                         "dst"   : dst_type,},)
                 WebUIDownloaderGUI.popup_menu(to_popup_menu)
-                return None, None, None
+                return False, None, None
             
         self.prnt(f"> civitai model version id : {id_}",
                   f"> civitai model type       : {tpe}\n", sep="\n")
         if dst_label == "auto" and self.destination is None:
             dst_label = civitai_type_map.get(tpe) or dst_label
         dst, self.label = self.new_dir_and_label(dst_label)
+        
         link = f"https://civitai.com/api/download/models/{id_}"
-        return self.requests_get_file(link, dst=dst, params=prm)
+        civ_key = WebUIDownloaderGUI.civ_key.value.strip()
+        hdrs = {"Authorization": f"Bearer {civ_key}"} if civ_key else None
+        
+        return self.requests_get_file(link, dst=dst, headers=hdrs, params=prm)
         
     @staticmethod
     def civitai_pars_link(link):
@@ -529,11 +529,11 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                 return None, idm.group(), None
         raise Exception(f"> civitai link error:\n{link}")
         
-    def civitai_denied(self, link, requests_obj):
+    def civitai_denied(self, requests_obj):
         msg = "The creator of this asset requires you to be logged in to download it"
-        if hasattr(requests_obj, "text") and msg in requests_obj.text:
+        if msg in getattr(requests_obj, "text", ""):
             self.prnt(msg)
-            self.error_report.append(f"{link}\n{msg}")
+            self.error_report.append(f"{self.link}\n{msg}")
             return True
         
     def requests_get_json(self, link):
@@ -554,7 +554,7 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
             if link.endswith(EXT):
                 filename = link.rsplit('/')[-1]
             else:
-                if self.civitai_denied(link, r):
+                if self.civitai_denied(r):
                     return None, None, None
                 raise Exception("> download error (extension\\response)")
         else:
@@ -660,9 +660,10 @@ class WebUIDownloaderGUI:
                     options = ("",) + tuple(WebUIDownloader.gd_PATHS),
                     description = "Copy to:"
                     )
-        cls.mega_login = wgt.Text(description = "Login:")
+        cls.mega_login    = wgt.Text(description = "Login:")
         cls.mega_password = wgt.Password(description = "Password:")
-        cls.hf_token = wgt.Text()
+        cls.hf_token      = wgt.Text()
+        cls.civ_key       = wgt.Text()
         
         # --- buttons ---
         
@@ -723,14 +724,18 @@ class WebUIDownloaderGUI:
         cls.to_dis  = [cls.btn_GDrive, cls.btn_Copy_i, btn_Zip, btn_Del,
                        btn_Download, btn_Refresh, btn_Move, btn_Copy,
                        cls.btn_M_login, cls.btn_M_upld]
-        ''' Hugging Face token '''
-        cls.key_hf  = wgt.Accordion(children = [cls.hf_token],
-                                    selected_index = None,
-                                    layout = wgt.Layout(width = "340px",
-                                                        margin = "15px 0 0 0"))
+        ''' api keys '''
+        a_opt = {"selected_index": None,
+                 "layout": wgt.Layout(width="340px", margin="15px 0 0 0")}
+        cls.key_civ = wgt.Accordion(children = [cls.civ_key], **a_opt)
+        cls.key_hf  = wgt.Accordion(children = [cls.hf_token], **a_opt)
+        cls.key_civ.set_title(0, "Civitai API key")
+        cls.key_hf.set_title(0, "Hugging Face token")
+        ''' containers '''
         box_dwnld  = wgt.VBox([wgt.HBox([wgt.VBox(cls.ui_input),
                                          wgt.VBox([cls.rb_input])]),
-                               cls.dst_d, btn_Download, cls.key_hf])
+                               cls.dst_d, btn_Download,
+                               cls.key_civ, cls.key_hf])
         box_files  = wgt.VBox([wgt.HBox([btn_Refresh,cls.btn_GDrive]),
                                cls.files, cls.dst_m,
                                wgt.HBox([btn_Move, btn_Copy, btn_Del])])
@@ -739,8 +744,7 @@ class WebUIDownloaderGUI:
         box_mega   = wgt.VBox([btn_Refresh, cls.files, cls.btn_M_upld,
                                wgt.HTML(value="<br>"), cls.mega_login,
                                cls.mega_password, cls.btn_M_login])
-        
-        cls.key_hf.set_title(0, "Hugging Face token")
+        ''' tabs '''
         cls.tab = wgt.Tab()
         for i, t in enumerate(("download", "files", "images", "mega")):
             cls.tab.set_title(i, t)
