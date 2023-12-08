@@ -82,14 +82,14 @@ EXT = (".ckpt", ".safetensors", ".pt", ".bin", ".json", ".yaml",)
 IMG = (".png", ".txt", ".jpg",)
 ZIP = (".zip",)
 
-if 'do_once' not in dir():
+if "do_once" not in dir():
     do_once = None
     !pip install -U --no-cache-dir gdown --pre # gdown --no-cookies XXX
     import os, re, shutil, requests, gdown, time
     import subprocess, shlex, contextlib # for Mega
     import ipywidgets as wgt
     from IPython.display import display, HTML, clear_output
-    if 'CATALOG' not in dir(): CATALOG = {}
+    if "CATALOG" not in dir(): CATALOG = {}
     clear_output()
 
 
@@ -395,7 +395,7 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         elif "tpe" in kw:
             ''' for civitai popup download '''
             return self.civitai_get(id_=link, dst_label=dst_label,
-                                  popup_download=True, **kw)
+                                    popup_download=True, **kw)
         elif link.isdigit():
             ''' civitai model version id '''
             return self.civitai_get(id_=link, dst_label=dst_label)
@@ -420,8 +420,8 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         self.prnt('\n> download from huggingface.co\n')
         dst, self.label = self.new_dir_and_label(dst_label)
         hf_token = WebUIDownloaderGUI.hf_token.value.strip()
-        h = {"Authorization": f"Bearer {hf_token}"} if hf_token else None
-        return self.requests_get_file(link, dst=dst, headers=h)
+        hdrs = {"Authorization": f"Bearer {hf_token}"} if hf_token else None
+        return self.requests_get_file(link, dst=dst, headers=hdrs)
         
     def google_get(self, id_, dst_label):
         self.prnt('\n> download from google drive\n')
@@ -460,7 +460,7 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         ''' "id_" = modelVersionId, "idm" = modelId '''
         
         if not popup_download:
-            self.prnt('\n> download from civitai.com\n')
+            self.prnt('\n> download from civitai.com')
             if link is not None:
                 id_, idm, prm = self.civitai_pars_link(link)
             
@@ -489,17 +489,19 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                         dst_type = civitai_type_map.get(tpe) or "root"
                     else:
                         dst_type = civitai_type_map.get(dst_type) or "root"
+                    prm_key = ("format", "size", "fp",)
+                    add_prm = {k:f["metadata"][k] for k in prm_key if k in f["metadata"]}
                     to_popup_menu.append({
                         "id"    : id_,
                         "name"  : f["name"],
                         "size"  : int(kb/1024) if kb >= 1024 else round(kb/1024, 3),
                         "type"  : f["type"],
-                        "params": {"type": f["type"], "format": f["metadata"]["format"]},
+                        "params": {"type": f["type"], **add_prm},
                         "dst"   : dst_type,},)
                 WebUIDownloaderGUI.popup_menu(to_popup_menu)
                 return False, None, None
             
-        self.prnt(f"> civitai model version id : {id_}",
+        self.prnt(f"\n> civitai model version id : {id_}",
                   f"> civitai model type       : {tpe}\n", sep="\n")
         if dst_label == "auto" and self.destination is None:
             dst_label = civitai_type_map.get(tpe) or dst_label
@@ -531,7 +533,7 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
         
     def civitai_denied(self, requests_obj):
         msg = "The creator of this asset requires you to be logged in to download it"
-        if msg in getattr(requests_obj, "text", ""):
+        if msg in (getattr(requests_obj, "text", "") or ""):
             self.prnt(msg)
             self.error_report.append(f"{self.link}\n{msg}")
             return True
@@ -808,9 +810,9 @@ class WebUIDownloaderGUI:
         cls.disabled.append(btn_Dwnld_p)
         cls.to_dis.append(btn_Dwnld_p)
         
-        cls.popup_menus[btn_Dwnld_p] = {'dropdown':dropdown_tmp, 'files':files_list}
+        cls.popup_menus[btn_Dwnld_p] = {"dropdown":dropdown_tmp, "files":files_list}
         display(btn_Dwnld_p)
-        cls.prnt('')
+        cls.prnt("")
         
     # --- actions ---
     
