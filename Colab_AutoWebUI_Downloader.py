@@ -312,8 +312,8 @@ class WebUIDownloaderNew(WebUIDownloaderFile):
                     self.label = self.destination
                 else:
                     self.label = k
-                break
                 self.queue_done.append(self.link)
+                break
         else:
             self.filename = None
             # self.short = None # wip
